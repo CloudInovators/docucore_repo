@@ -1,0 +1,9 @@
+openai
+pymupdf
+databricks-sdk
+pandas
+pygments
+radon
+bandit
+streamlit-ace
+streamlit
