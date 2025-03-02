@@ -1,0 +1,161 @@
+# trigger:
+# - main
+
+# pool:
+#   name: dbx-pool
+
+# # variables:
+# # - group: db_variable
+
+# stages:
+# - stage: Build
+#   displayName: 'Build Databricks Bundle'
+#   jobs:
+#   - job: BuildDatabricksBundle
+#     displayName: 'Build Databricks Asset Bundle'
+#     steps:
+#     - checkout: self
+#       displayName: 'Checkout Repository'
+
+#     - script: |
+#         databricks workspace list /Users
+#       displayName: 'Ensure Databricks CLI is Installed'
+#       env:
+#         DATABRICKS_HOST: 'https://adb-3997317045094469.9.azuredatabricks.net'
+#         DATABRICKS_TOKEN: 'dapi9d9c8fcf99eec7e5b8c42efcfc7b314b-3'
+
+#     - publish: $(System.DefaultWorkingDirectory)/pdf_summarizer
+#       artifact: src-code-analysis-bundle
+#       displayName: 'Publish Databricks src-code-analysis-bundle as Artifact'
+
+#     - publish: $(System.DefaultWorkingDirectory)/src_code_analysis
+#       artifact: src-code-analysis-bundle
+#       displayName: 'Publish Databricks Src-Code-Analysis-Bundle as Artifact'
+
+# - stage: Deploy_PDF_Summarizer
+#   displayName: 'Deploy PDF Summarizer'
+#   dependsOn: Build
+#   jobs:
+#   - job: DeployBundle
+#     displayName: 'Deploy Databricks Asset Bundle'
+#     steps:
+#     - checkout: self
+#       displayName: 'Checkout Repository'
+
+#     - download: current
+#       artifact: src-code-analysis-bundle
+#       displayName: 'Download Databricks Bundle Artifact'
+
+#     - script: |
+#         cd $(Pipeline.Workspace)/src-code-analysis-bundle
+#         databricks apps create srcodeanalysis
+#         databricks workspace import-dir . /Workspace/Users/cloudinnovators3383@gmail.com/srcodeanalysis
+#       displayName: 'Create Databricks App for Pdf Summarizer'
+#       env:
+#         DATABRICKS_HOST: 'https://adb-3997317045094469.9.azuredatabricks.net'
+#         DATABRICKS_TOKEN: 'dapi9d9c8fcf99eec7e5b8c42efcfc7b314b-3'
+
+#     - script: |
+#         cd $(Pipeline.Workspace)/src-code-analysis-bundle
+#         databricks apps deploy srcodeanalysis --source-code-path /Workspace/Users/cloudinnovators3383@gmail.com/srcodeanalysis
+#       displayName: 'Deploy Databricks App for Pdf Summarizer'
+#       env:
+#         DATABRICKS_HOST: 'https://adb-3997317045094469.9.azuredatabricks.net'
+#         DATABRICKS_TOKEN: 'dapi9d9c8fcf99eec7e5b8c42efcfc7b314b-3'
+
+# - stage: Deploy_Source_Code_Analyzer
+#   displayName: 'Deploy Source Code Analyzer'
+#   dependsOn: Build
+#   jobs:
+#   - job: DeployBundle
+#     displayName: 'Deploy Databricks Asset Bundle'
+#     steps:
+#     - checkout: self
+#       displayName: 'Checkout Repository'
+
+#     - download: current
+#       artifact: src-code-analysis-bundle
+#       displayName: 'Download Databricks Bundle Artifact'
+
+#     - script: |
+#         cd $(Pipeline.Workspace)/src-code-analysis-bundle
+#         databricks apps create srcodeanalysis
+#         databricks workspace import-dir . /Workspace/Users/cloudinnovators3383@gmail.com/srcodeanalysis
+#       displayName: 'Create Databricks App for Source Code Analyzer'
+#       env:
+#         DATABRICKS_HOST: 'https://adb-3997317045094469.9.azuredatabricks.net'
+#         DATABRICKS_TOKEN: 'dapi9d9c8fcf99eec7e5b8c42efcfc7b314b-3'
+
+#     - script: |
+#         cd $(Pipeline.Workspace)/src-code-analysis-bundle
+#         databricks apps deploy srcodeanalysis --source-code-path /Workspace/Users/cloudinnovators3383@gmail.com/srcodeanalysis
+#       displayName: 'Deploy Databricks App for Source Code Analyzer'
+#       env:
+#         DATABRICKS_HOST: 'https://adb-3997317045094469.9.azuredatabricks.net'
+#         DATABRICKS_TOKEN: 'dapi9d9c8fcf99eec7e5b8c42efcfc7b314b-3'
+
+
+trigger: none  # Manual trigger to control deployments
+
+variables:
+  - group: Databricks_Variables  
+
+stages:
+  - stage: Build
+    displayName: "Build & Publish Artifacts"
+    jobs:
+      - job: Databricks_CI
+        displayName: "Run Databricks Build"
+        pool:
+          name: dbx-pool
+        steps:
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish Repository Artifacts"
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)/src_code_analysis'
+              artifact: src-code-analysis-bundle
+              displayName: 'Publish Databricks Src-Code-Analysis-Bundle as Artifact'
+
+
+# Deploy to multiple environments in sequence
+  - stage: Deploy_Dev
+    displayName: "Deploy to Dev"
+    pool:
+          name: dbx-pool
+    dependsOn: Build
+    jobs:
+      - template: ../Deployment_template/deployment-template.yml
+        parameters:
+          environment: dev
+          databricksHost: $(databricks_dev_host)
+          databricksToken: $(databricks_dev_token)
+          atifactName: src-code-analysis-bundle
+          dbxAppName:  srcodeanalysis
+
+  - stage: Deploy_UAT
+    displayName: "Deploy to UAT"
+    pool:
+          name: dbx-pool
+    dependsOn: Deploy_Dev
+    jobs:
+      - template: ../Deployment_template/deployment-template.yml
+        parameters:
+          environment: uat
+          databricksHost: $(databricks_uat_host)
+          databricksToken: $(databricks_uat_token)
+          atifactName: src-code-analysis-bundle
+          dbxAppName:  srcodeanalysis
+
+  - stage: Deploy_Prod
+    displayName: "Deploy to Prod"
+    pool:
+          name: dbx-pool
+    dependsOn: Deploy_UAT
+    jobs:
+      - template: ../Deployment_template/deployment-template.yml
+        parameters:
+          environment: prod
+          databricksHost: $(databricks_prod_host)
+          databricksToken: $(databricks_prod_token)
+          atifactName: src-code-analysis-bundle
+          dbxAppName:  srcodeanalysis

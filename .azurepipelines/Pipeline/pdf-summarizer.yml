@@ -1,0 +1,64 @@
+trigger: none  # Manual trigger to control deployments
+
+variables:
+  - group: Databricks_Variables  
+
+stages:
+  - stage: Build
+    displayName: "Build & Publish Artifacts"
+    jobs:
+      - job: Databricks_CI
+        displayName: "Run Databricks Build"
+        pool:
+          name: dbx-pool
+        steps:
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish Repository Artifacts"
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)/pdf_summarizer'
+              artifact: pdf-summarizer-bundle
+              displayName: 'Publish Databricks Pdf-Summarizer-Bundle as Artifact'
+
+
+# Deploy to multiple environments in sequence
+  - stage: Deploy_Dev
+    displayName: "Deploy to Dev"
+    pool:
+          name: dbx-pool
+    dependsOn: Build
+    jobs:
+      - template: ../Deployment_template/deployment-template.yml
+        parameters:
+          environment: dev
+          databricksHost: $(databricks_dev_host)
+          databricksToken: $(databricks_dev_token)
+          atifactName: pdf-summarizer-bundle
+          dbxAppName:  pdfsummarizer
+
+  - stage: Deploy_UAT
+    displayName: "Deploy to UAT"
+    pool:
+          name: dbx-pool
+    dependsOn: Deploy_Dev
+    jobs:
+      - template: ../Deployment_template/deployment-template.yml
+        parameters:
+          environment: uat
+          databricksHost: $(databricks_uat_host)
+          databricksToken: $(databricks_uat_token)
+          atifactName: pdf-summarizer-bundle
+          dbxAppName:  pdfsummarizer
+
+  - stage: Deploy_Prod
+    displayName: "Deploy to Prod"
+    pool:
+          name: dbx-pool
+    dependsOn: Deploy_UAT
+    jobs:
+      - template: ../Deployment_template/deployment-template.yml
+        parameters:
+          environment: prod
+          databricksHost: $(databricks_prod_host)
+          databricksToken: $(databricks_prod_token)
+          atifactName: pdf-summarizer-bundle
+          dbxAppName:  pdfsummarizer

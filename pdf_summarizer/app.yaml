@@ -8,4 +8,4 @@ env:
   - name: STREAMLIT_BROWSER_GATHER_USAGE_STATS
     value: "false"
   - name: "SERVING_ENDPOINT"
-    value: "https://adb-3066134158659108.8.azuredatabricks.net/serving-endpoints/databricks-dbrx-instruct"
+    value: "https://adb-3997317045094469.9.azuredatabricks.net/serving-endpoints/databricks-dbrx-instruct"
