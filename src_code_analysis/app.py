@@ -23,14 +23,12 @@ logger = logging.getLogger(__name__)
 # Initialize the Databricks Workspace Client
 w = WorkspaceClient()
 
-# Ensure environment variable is set correctly
+# Extract only the endpoint name from the full URL
 serving_endpoint = os.getenv("SERVING_ENDPOINT")
-
-# Debug: Display the environment variable
-st.write("Debug: SERVING_ENDPOINT:", serving_endpoint)
-
-# Ensure the variable is set
-assert serving_endpoint, "SERVING_ENDPOINT must be set in app.yaml."
+if serving_endpoint:
+    serving_endpoint = serving_endpoint.split("/")[-1]  # Extract only the endpoint name
+else:
+    st.error("SERVING_ENDPOINT environment variable is not set.")
 
 def calculate_code_metrics(code):
     """Calculate cyclomatic complexity and maintainability index."""
@@ -160,13 +158,6 @@ if uploaded_files:
         else:
             st.write("No security issues found.")
 
-        # if st.button(f"Export Results for {uploaded_file.name}"):
-        #     export_results(complexity, maintainability, security_report)
-        #     st.success("Results exported successfully!")
-            
-        #     # Provide a download link for the exported CSV file.
-        #     with open('analysis_results.csv', 'rb') as f:
-        #         st.download_button('Download CSV', f, file_name='analysis_results.csv')
         if st.button(f"Export Results for {uploaded_file.name}"):
             export_results(complexity, maintainability, security_report)
             st.success("Results exported successfully!")
@@ -179,43 +170,46 @@ if uploaded_files:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Chat functionality (separate from PDF summarization)
+st.subheader("Chat with the Assistant")
+
+# Display chat messages from history on app rerun
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask me anything about your code!"):
+# Accept user input for chatbot interaction
+if prompt := st.chat_input("Enter your question or message:"):
+    # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
+    # Display user message in chat message container
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Check if user is asking for analysis
-    if "analyze" in prompt.lower():
-        # Split the uploaded code into snippets
-        code_snippets = split_code_into_snippets(uploaded_code)
-        
-        explanations = []
-        
-        for snippet in code_snippets:
-            messages = [
-                ChatMessage(role=ChatMessageRole.SYSTEM, content="You are a helpful assistant."),
-                ChatMessage(role=ChatMessageRole.USER, content=f"Explain this code snippet step by step:\n\n{snippet}")
-            ]
-            
-            with st.chat_message("assistant"):
-                try:
-                    response = w.serving_endpoints.query(
-                        name=os.getenv("SERVING_ENDPOINT"),
-                        messages=messages,
-                        max_tokens=400,
-                    )
-                    if response.choices:
-                        explanation = response.choices[0].message.content.strip()
-                        explanations.append(explanation)
-                        st.markdown(f"### Explanation of Snippet:\n{explanation}")
-                    else:
-                        st.error("No response from model")
-                except Exception as e:
-                    st.error(f"Error querying model: {e}")
+    # Prepare chat messages for the assistant
+    messages = [
+        ChatMessage(role=ChatMessageRole.SYSTEM, content="You are a helpful assistant."),
+    ]
+
+    # Add chat history to maintain context
+    for msg in st.session_state.messages:
+        messages.append(ChatMessage(role=ChatMessageRole.USER if msg["role"] == "user" else ChatMessageRole.ASSISTANT, content=msg["content"]))
+
+    # Query the assistant and append the response
+    try:
+        response = w.serving_endpoints.query(
+            name=serving_endpoint,  # ✅ Using extracted endpoint name
+            messages=messages,
+            max_tokens=400,
+        )
+        assistant_response = response.choices[0].message.content
+
+        # Display and save assistant response
+        with st.chat_message("assistant"):
+            st.markdown(assistant_response)
+        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+    except Exception as e:
+        st.error(f"Error querying model: {e}")
 
 # Interactive code editing using Ace Editor
 code_editor_content = stace.st_ace(
@@ -276,8 +270,3 @@ if st.button("Analyze Code"):
             st.markdown("---")
     else:
         st.write("No security issues found.")
-
-
-
-
-
