@@ -8,13 +8,17 @@ import io
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 # Initialize the Databricks Workspace Client
 w = WorkspaceClient()
 
-# Ensure environment variable is set correctly
-assert os.getenv('SERVING_ENDPOINT'), "SERVING_ENDPOINT must be set in app.yaml."
+# Extract only the endpoint name from the full URL
+serving_endpoint = os.getenv("SERVING_ENDPOINT")
+if serving_endpoint:
+    serving_endpoint = serving_endpoint.split("/")[-1]  # Extract only the endpoint name
+else:
+    st.error("SERVING_ENDPOINT environment variable is not set.")
 
 # Get user info (if applicable)
 def get_user_info():
@@ -74,7 +78,7 @@ if uploaded_pdf:
         
         # Send the request to Databricks model for summarization
         response = w.serving_endpoints.query(
-            name=os.getenv("SERVING_ENDPOINT"),
+            name=serving_endpoint,  # ✅ Now correctly using extracted endpoint name
             messages=messages,
             max_tokens=400,
         )
@@ -114,7 +118,7 @@ if prompt := st.chat_input("Enter your question or message:"):
     # Query the assistant and append the response
     try:
         response = w.serving_endpoints.query(
-            name=os.getenv("SERVING_ENDPOINT"),
+            name=serving_endpoint,  # ✅ Using extracted endpoint name
             messages=messages,
             max_tokens=400,
         )
