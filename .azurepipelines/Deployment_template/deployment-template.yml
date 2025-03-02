@@ -1,0 +1,39 @@
+parameters:
+  - name: environment
+    type: string
+  - name: databricksHost
+    type: string
+  - name: databricksToken
+    type: string
+  - name: atifactName
+    type: string
+  - name: dbxAppName
+    type: string
+
+jobs:
+  - job: DeployBundle
+    displayName: 'Deploy Databricks Asset Bundle'
+    steps:
+    - checkout: self
+      displayName: 'Checkout Repository'
+
+    - download: current
+      artifact: ${{ parameters.atifactName }}
+      displayName: 'Download Databricks Bundle Artifact'
+
+    - script: |
+        cd $(Pipeline.Workspace)/${{ parameters.atifactName }}
+        databricks apps create ${{ parameters.dbxAppName }}
+        databricks workspace import-dir . /Workspace/Users/cloudinnovators3383@gmail.com/${{ parameters.dbxAppName }}
+      displayName: 'Create Databricks App for PDF Summarizer'
+      env:
+        DATABRICKS_HOST: ${{ parameters.databricksHost }}
+        DATABRICKS_TOKEN: ${{ parameters.databricksToken }}
+
+    - script: |
+        cd $(Pipeline.Workspace)/${{ parameters.atifactName }}
+        databricks apps deploy ${{ parameters.dbxAppName }} --source-code-path /Workspace/Users/cloudinnovators3383@gmail.com/${{ parameters.dbxAppName }}
+      displayName: 'Deploy Databricks App for PDF Summarizer'
+      env:
+        DATABRICKS_HOST: ${{ parameters.databricksHost }}
+        DATABRICKS_TOKEN: ${{ parameters.databricksToken }}
